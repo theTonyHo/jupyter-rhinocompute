@@ -2,4 +2,3 @@ numpy
 ipywidgets
 nbinteract
 cmake
-compute-rhino3d
