@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.7.8/angular.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-websocket/2.0.1/angular-websocket.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script> -->
+<!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script> -->
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <head>
+  <style >
+  body {
+    margin: 10px;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    text-align: left;
+    background-color: #fff;
+  }
+  h1 {
+      color: #fff;
+    background-color: #000;
+    padding-left: 20px;
+    padding: 10px;
+  }
+  h3 {
+      color: #fff;
+    background-color: #000;
+    padding-left: 20px;
+    padding: 10px;
+  }
+    </style>
+</head>
+  <body>
+    <div ng-app="myApp">
+      <div ng-controller="myController" id="yourControllerElementID">
+        <h1>Jupiter POC</h1>
+        <h3>Project : {{ project["name"] }}</h3>
+
+        <select class="form-control"
+          ng-model="scenario"
+          ng-change="onSelect()"
+          ng-options="x['name'] for x in project['scenarios']" style="width: 100%;"
+        >
+          <option value="">-- please choose a scenario --</option>
+        </select>
+
+        <h2>Selected : {{ scenario["name"] }}</h2>
+        <p>Scenario Id : {{ scenario["id"] }}</p>
+        <input class="form-control"
+          type="text"
+          id="myValueFromController"
+          value="{{ selectedScenarioId }}" style="width: 100%;"
+        />
+<!--           
+        <ul class="list-group">
+            <li class="list-group-item" ng-repeat="(country,goals) in scenario['attributes']">{{country}}: {{goals}}</li>
+        </ul>
+         -->
+
+        <hr>
+        <div uib-alert ng-class="'alert-' + (alertType || 'warning')" >Websocket Status :  {{statusMessage}}</div>
+         <hr>
+        <table class="table">
+            <thead>
+              <tr>
+                <th scope="col" style="width:150px;">Key</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="(key,value) in scenario['attributes']">
+                <td>{{key}}</td>
+                <td>{{value}}</td>
+              </tr>
+            </tbody>
+          </table>
+        
+      </div>
+    </div>
+
+    <script>
+      var scenario = {
+        id: "a7150818-8ae4-4e54-9909-1079164bc250"
+      };
+      var app = angular.module("myApp", ["ngWebSocket"]);
+      app.controller("myController", myController);
+
+      //Set default values
+      function myController($scope, $http) {
+        $scope.project = {
+          name: "Loading Project"
+        };
+        $scope.scenario = null;
+        $scope.selectedScenarioId = null;
+        $scope.alertType = "";
+        // Get All kernels on load
+        $http
+          .get(
+            "http://jupyteralb-1393537276.ap-southeast-2.elb.amazonaws.com/api/kernels?token=" +
+              "JupyterNotebookForEl1Token2" // Token, Security issues
+          )
+          .then(function(response) {
+            $scope.kernels = response.data;
+            $scope.kernel = $scope.kernels[0];
+          });
+
+        // Get Project Scenarios on load
+        $http
+          .get(
+            "https://dev.eli.digital/Prod/api/Projects/ba659baa-fd78-4bf9-a517-bf07c7ce2fd0?includeAllRelatedEntities=false"
+          )
+          .then(function(response) {
+            $scope.project = response.data;
+          });
+
+        // OnSelect event
+        $scope.onSelect = function() {
+          try {
+            $scope.selectedScenarioId = $scope.scenario["id"];
+            WSConnect(StoreScenarioId($scope.selectedScenarioId));
+
+          }
+          catch {
+            $scope.selectedScenarioId = "";
+            $scope.statusMessage = "";
+            $scope.alertType = "";
+          }
+
+        };
+      }
+      function uuidv4() {
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(
+          c
+        ) {
+          var r = (Math.random() * 16) | 0,
+            v = c == "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      }
+
+      function StoreScenarioId(scenarioId) {
+        code = "scenario = { 'id' : '" + scenarioId + "' } \n%store scenario ";
+        let msg_type = "execute_request";
+        let content = {
+          code: code,
+          silent: "False"
+        };
+        let hdr = {
+          msg_id: uuidv4(),
+          username: "test",
+          session: uuidv4(),
+          data: new Date(),
+          msg_type: msg_type,
+          version: "5.0"
+        };
+        let msg = {
+          header: hdr,
+          parent_header: hdr,
+          metadata: {},
+          content: content
+        };
+        return msg;
+      }
+
+      var ws = null;
+      //Connect to Websocket
+      function WSConnect(msg) {
+        var $scope = getScope("myController");
+
+        console.log($scope.kernel);
+        var kernel = $scope.kernel;
+        var baseWs = "ws://jupyteralb-1393537276.ap-southeast-2.elb.amazonaws.com";
+        var headers = { "Authorization": "Token JupyterNotebookForEl1Token2"}; // websocket javascript does not require token ?
+        var connectionString = baseWs + "/api/kernels/" + kernel["id"] + "/channels";
+
+        console.log("Connecting WS: " + connectionString);
+        ws = new WebSocket(connectionString);
+
+
+        ws.onopen = function(e) {
+          console.log(ws.readyState);
+          // alert("[open] Connection established");
+          // alert("Sending to server");
+          // console.log(JSON.stringify(msg));
+          $scope.statusMessage = "[open] Connection established";
+          ws.send(JSON.stringify(msg));
+        };
+
+        ws.onmessage = function(event) {
+          // alert(`[message] Data received from server: ${event.data}`);
+          if (event.data['msg_type'] = "stream"){
+            $scope.statusMessage = "Data Sent to Jupyter ... ";
+            $scope.alertType = "success";
+          }
+          else {
+            $scope.statusMessage = "Sending Data ... ";
+            $scope.alertType = "";
+          }
+          $scope.$apply();
+          console.log(event.data);
+        };
+
+        ws.onclose = function(event) {
+          if (event.wasClean) {
+            // alert(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+          } else {
+            // e.g. server process killed or network down
+            // event.code is usually 1006 in this case
+            // alert("[close] Connection died");
+          }
+          $scope.statusMessage = "";
+        };
+
+        ws.onerror = function(error) {
+          alert(`[error] ${error.message}`);
+        };
+
+        console.log(ws);
+      }
+
+      function getScope(ctrlName) {
+        var sel = 'div[ng-controller="' + ctrlName + '"]';
+
+        return angular
+          .element(document.getElementById("yourControllerElementID"))
+          .scope();
+      }
+    </script>
+  </body>
+</html>
