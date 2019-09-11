@@ -21,6 +21,7 @@
             "assets": [
               "src/favicon.ico",
               "src/jupyter-notebooks",
+              "src/singlePages",
               "src/assets"
             ],
             "styles": [
